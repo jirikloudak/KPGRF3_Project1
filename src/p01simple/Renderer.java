@@ -8,6 +8,8 @@ import transforms.Camera;
 import transforms.Mat4PerspRH;
 import transforms.Vec3D;
 
+import java.io.IOException;
+
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL20.*;
 
@@ -19,11 +21,12 @@ import static org.lwjgl.opengl.GL20.*;
 public class Renderer extends AbstractRenderer {
 
     private int shaderProgram;
-    private int locView, locProjection;
+    private int locView, locProjection, locType;
     private OGLBuffers buffers;
     private Camera camera;
     private Mat4PerspRH projection;
     private OGLTexture2D.Viewer textureViewer;
+    private OGLTexture2D textureMosaic;
 
     @Override
     public void init() {
@@ -36,6 +39,7 @@ public class Renderer extends AbstractRenderer {
 
         locView = glGetUniformLocation(shaderProgram, "view");
         locProjection = glGetUniformLocation(shaderProgram, "projection");
+        locType = glGetUniformLocation(shaderProgram, "type");
 
         buffers = GridFactory.generateGrid(50, 50);
 
@@ -52,6 +56,11 @@ public class Renderer extends AbstractRenderer {
         );
 
         textureViewer = new OGLTexture2D.Viewer();
+        try {
+            textureMosaic = new OGLTexture2D("./textures/mosaic.jpg");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -69,7 +78,16 @@ public class Renderer extends AbstractRenderer {
         glUniformMatrix4fv(locView, false, camera.getViewMatrix().floatArray());
         glUniformMatrix4fv(locProjection, false, projection.floatArray());
 
+        // vykreslit první těleso
+        glUniform1i(locType, 1);
         buffers.draw(GL_TRIANGLES, shaderProgram);
+
+        // vykreslit druhé těleso (do stejné scény)
+        glUniform1i(locType, 2);
+        buffers.draw(GL_TRIANGLES, shaderProgram);
+
+        textureViewer.view(textureMosaic, -1, -1, 0.5);
+        textRenderer.addStr2D(width - 90, height - 3, " (c) PGRF UHK");
     }
 
 }
