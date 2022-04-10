@@ -1,6 +1,10 @@
 package p01simple;
 
 import lwjglutils.OGLBuffers;
+import lwjglutils.ToIntArray;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class GridFactory {
 
@@ -39,9 +43,5 @@ public class GridFactory {
         };
         return new OGLBuffers(vb, attributes, ib);
     }
-
-//    public static void main(String[] args) {
-//        generateGrid(4, 4);
-//    }
 
 }
