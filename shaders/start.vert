@@ -1,8 +1,11 @@
 #version 150
 in vec2 inPosition; // input from the vertex buffer
 
+out vec3 finalPosition;
+
 uniform mat4 projection;
 uniform mat4 view;
+uniform mat4 model;
 uniform int type;
 
 const float PI = 3.1415;
@@ -28,7 +31,7 @@ vec3 getPyramid(vec2 vec) {
 }
 
 // Tunel - https://christopherchudzicki.github.io/MathBox-Demos/parametric_surfaces_3D.html
-vec3 getTunnel(vec2 vec) {
+vec3 getTunel(vec2 vec) {
     float u = vec.x * PI;
 	float v = vec.y * PI / 2.0;
 
@@ -77,27 +80,27 @@ vec3 getKleinBottle(vec2 vec) {
 }
 
 void main() {
-//	texCoord = inPosition;
-
-	// grid je <0;1> - chci <-1;1>
 	vec2 position = inPosition * 2 - 1;
 
-	vec3 finalPosition;
-	//	vec3 normal;
-	if (type == 1) {
-		finalPosition = getKleinBottle(position);
-		//		normal = getSphereNormal(position);
-	} else if (type == 2) {
-		finalPosition = getSphere(position);
-		//		normal = getOtherNormal(position);
-	} else if (type == 3) {
-     		finalPosition = getPyramid(position);
-     		//		normal = getOtherNormal(position);
-    } else if (type == 4) {
-          		finalPosition = getDonut(position);
-          		//		normal = getOtherNormal(position);
+    switch (type) {
+        case 1:
+            finalPosition = getSphere(position);
+            break;
+        case 2:
+            finalPosition = getPyramid(position);
+            break;
+        case 3:
+            finalPosition = getDonut(position);
+            break;
+        case 4:
+            finalPosition = getKleinBottle(position);
+            break;
+        case 5:
+            finalPosition = getTunel(position);
+            break;
     }
-	vec4 pos4 = vec4(finalPosition, 1.0);
-	gl_Position = projection * view * pos4;
+
+	vec4 pos4 = view * model * vec4(finalPosition, 1.0);
+	gl_Position = projection * pos4;
 
 } 

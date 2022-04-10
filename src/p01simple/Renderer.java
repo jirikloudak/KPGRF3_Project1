@@ -2,6 +2,7 @@ package p01simple;
 //package lvl2advanced.p01gui.p01simple;
 
 import lwjglutils.OGLBuffers;
+import lwjglutils.OGLRenderTarget;
 import lwjglutils.OGLTexture2D;
 import lwjglutils.ShaderUtils;
 import org.lwjgl.BufferUtils;
@@ -26,14 +27,19 @@ import static org.lwjgl.opengl.GL20.*;
 public class Renderer extends AbstractRenderer {
 
     private int shaderProgram;
-    private int locView, locProjection, locType, modeO1 = 1, modeO2 = 2;
+    private int locView, locProjection, locType, locModel;
     private OGLBuffers buffers;
     private Camera camera;
     private Mat4 projection;
+    private Mat4 matTranslSphere, matRotZ;
     private OGLTexture2D.Viewer textureViewer;
     private OGLTexture2D textureMosaic;
     boolean mouseButton1 = false, perspProjection = true;
     double ox, oy;
+    private boolean draw = true;
+    private float time = 0;
+    private OGLRenderTarget renderTarget;
+
 
     @Override
     public void init() {
@@ -44,9 +50,11 @@ public class Renderer extends AbstractRenderer {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); // vyplnění přivrácených i odvrácených stran
         shaderProgram = ShaderUtils.loadProgram("/start");
 
+        locModel = glGetUniformLocation(shaderProgram, "model");
         locView = glGetUniformLocation(shaderProgram, "view");
         locProjection = glGetUniformLocation(shaderProgram, "projection");
         locType = glGetUniformLocation(shaderProgram, "type");
+
 
         buffers = GridFactory.generateGrid(50, 50);
 
@@ -61,32 +69,45 @@ public class Renderer extends AbstractRenderer {
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        matTranslSphere = new Mat4Transl(0.0, 0.0, 1.5);
+
     }
 
-    @Override
-    public void display() {
+    public void render(){
         glUseProgram(shaderProgram);
-
-        // znovu zapnout z-test (kvůli textRenderer)
-        glEnable(GL_DEPTH_TEST);
-
-        // nutno opravit viewport (kvůli textRenderer)
-        glViewport(0, 0, width, height);
-
-        setProjection();
-
+        //renderTarget.bind();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glUniformMatrix4fv(locView, false, camera.getViewMatrix().floatArray());
         glUniformMatrix4fv(locProjection, false, projection.floatArray());
 
-        // vykreslit první těleso
-        glUniform1i(locType, modeO1);
+        // Draw Sphere
+        glUniformMatrix4fv(locModel, false, matTranslSphere.floatArray());
+        glUniform1i(locType, 1);
         buffers.draw(GL_TRIANGLES, shaderProgram);
 
         // vykreslit druhé těleso (do stejné scény)
-        glUniform1i(locType, modeO2);
+        glUniformMatrix4fv(locModel, false, matRotZ.floatArray());
+        glUniform1i(locType, 2);
         buffers.draw(GL_TRIANGLES, shaderProgram);
+    }
+
+    @Override
+    public void display() {
+        if (draw) {
+            if (time <= Math.PI * 2) time += 0.01;
+            else time = 0;
+        }
+        matRotZ = new Mat4RotZ(time);
+        // znovu zapnout z-test (kvůli textRenderer)
+        glEnable(GL_DEPTH_TEST);
+
+        // nutno opravit viewport (kvůli textRenderer)
+        glViewport(0, 0, width, height);
+        setProjection();
+        render();
+
 
         textureViewer.view(textureMosaic, -1, -1, 0.5);
         textRenderer.addStr2D(width - 90, height - 3, " (c) PGRF UHK");
@@ -128,13 +149,6 @@ public class Renderer extends AbstractRenderer {
                         break;
                     case GLFW_KEY_C:
                         perspProjection = !perspProjection;
-                        break;
-                    case GLFW_KEY_1:
-                        if (modeO1 == 1){
-                            modeO1 = 0;
-                    } else {
-                            modeO1 = 1;
-                        }
                         break;
                 }
             }
