@@ -45,11 +45,12 @@ vec3 getTunel(vec2 vec) {
 vec3 getDonut(vec2 vec) {
     float u = vec.x * PI;
 	float v = vec.y * PI - PI / 2;
+	vec3 position;
 
-	float x = 3 * cos(u) + cos(v) * cos(u);
-	float y = 3 * sin(u) + cos(v) * sin(u);
-	float z = sin(v);
-	return vec3(x, y, z);
+	position.x = 3 * cos(u) + cos(v) * cos(u);
+	position.y = 3 * sin(u) + cos(v) * sin(u);
+	position.z = sin(v);
+	return position / 3;
 }
 
 
@@ -76,7 +77,7 @@ vec3 getKleinBottle(vec2 vec) {
     float z;
     position.z = 3 * (1 - cos(u)/2) * sin(v);
 
-    return position / 4;
+    return position / 5;
 }
 
 void main() {

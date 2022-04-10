@@ -27,11 +27,11 @@ import static org.lwjgl.opengl.GL20.*;
 public class Renderer extends AbstractRenderer {
 
     private int shaderProgram;
-    private int locView, locProjection, locType, locModel;
+    private int locView, locProjection, locType, locModel, drawMode = 1;
     private OGLBuffers buffers;
     private Camera camera;
     private Mat4 projection;
-    private Mat4 matTranslSphere, matRotZ;
+    private Mat4 matTranslSphere, matTranslDonut, matTranslBottle, matRotZ, matRotX, matRotY;
     private OGLTexture2D.Viewer textureViewer;
     private OGLTexture2D textureMosaic;
     boolean mouseButton1 = false, perspProjection = true;
@@ -71,11 +71,14 @@ public class Renderer extends AbstractRenderer {
         }
 
         matTranslSphere = new Mat4Transl(0.0, 0.0, 1.5);
+        matTranslDonut = new Mat4Transl(0.0, 0.0, -4.0);
+        matTranslBottle = new Mat4Transl(0.0, -1.0, -4.0);
 
     }
 
     public void render(){
         glUseProgram(shaderProgram);
+        setMode();
         //renderTarget.bind();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -87,9 +90,24 @@ public class Renderer extends AbstractRenderer {
         glUniform1i(locType, 1);
         buffers.draw(GL_TRIANGLES, shaderProgram);
 
-        // vykreslit druhé těleso (do stejné scény)
+        // Draw Pyramid
         glUniformMatrix4fv(locModel, false, matRotZ.floatArray());
         glUniform1i(locType, 2);
+        buffers.draw(GL_TRIANGLES, shaderProgram);
+
+        //Draw Donut
+        glUniformMatrix4fv(locModel, false, matTranslDonut.mul(matRotY).floatArray());
+        glUniform1i(locType, 3);
+        buffers.draw(GL_TRIANGLES, shaderProgram);
+
+        //Draw Bottle
+        glUniformMatrix4fv(locModel, false, matTranslBottle.floatArray());
+        glUniform1i(locType, 4);
+        buffers.draw(GL_TRIANGLES, shaderProgram);
+
+        //Draw Tunel
+        glUniformMatrix4fv(locModel, false, matTranslBottle.floatArray());
+        glUniform1i(locType, 5);
         buffers.draw(GL_TRIANGLES, shaderProgram);
     }
 
@@ -100,6 +118,8 @@ public class Renderer extends AbstractRenderer {
             else time = 0;
         }
         matRotZ = new Mat4RotZ(time);
+        matRotX = new Mat4RotX(time);
+        matRotY = new Mat4RotY(time);
         // znovu zapnout z-test (kvůli textRenderer)
         glEnable(GL_DEPTH_TEST);
 
@@ -149,6 +169,15 @@ public class Renderer extends AbstractRenderer {
                         break;
                     case GLFW_KEY_C:
                         perspProjection = !perspProjection;
+                        break;
+                    case GLFW_KEY_M:
+                        if (drawMode < 3){
+                            drawMode +=1;
+                            System.out.println(drawMode);
+                        } else {
+                        drawMode = 1;
+                        System.out.println(drawMode);
+                    }
                         break;
                 }
             }
@@ -216,6 +245,20 @@ public class Renderer extends AbstractRenderer {
             projection = new Mat4PerspRH(Math.PI / 3, LwjglWindow.HEIGHT / (float) LwjglWindow.WIDTH, 1, 20);
         } else {
             projection = new Mat4OrthoRH(50, 50, 0.1, 100);
+        }
+    }
+
+    public void setMode(){
+        switch (drawMode){
+            case 1:
+                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                break;
+            case 2:
+                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                break;
+            case 3:
+                glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
+                break;
         }
     }
 
