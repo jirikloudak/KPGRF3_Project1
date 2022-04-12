@@ -1,5 +1,5 @@
 #version 150
-in vec2 inPosition; // input from the vertex buffer
+in vec2 inPosition;// input from the vertex buffer
 
 out vec3 finalPosition, normal, viewDir, lightDirView, lightDirWorld;
 out vec2 texCoord;
@@ -15,17 +15,17 @@ uniform float time;
 const float PI = 3.1415;
 
 float getZ(vec2 vec) {
-	return sin(vec.y * PI/2 * 5);
+    return sin(vec.y * PI/2 * 5);
 }
 
 vec3 getSphere(vec2 vec, float r) {
-	float az = vec.x * PI; // <-1;1> -> <-PI;PI>
-	float ze = vec.y * PI / 2.0; // <-1;1> -> <-PI/2;PI/2>
+    float az = vec.x * PI;// <-1;1> -> <-PI;PI>
+    float ze = vec.y * PI / 2.0;// <-1;1> -> <-PI/2;PI/2>
 
-	float x = r * cos(az) * cos(ze);
-	float y = r * sin(az) * cos(ze);
-	float z = r * sin(ze);
-	return vec3(x, y, z);
+    float x = 1.5 * r * cos(az) * cos(ze);
+    float y = r * sin(az) * cos(ze);
+    float z = r * sin(ze);
+    return vec3(x, y, z);
 }
 
 vec3 normSphere(vec2 vec, float r) {
@@ -38,7 +38,7 @@ vec3 normSphere(vec2 vec, float r) {
 
 vec3 getPyramid(vec2 vec) {
     return vec3(2 * vec.x, 2 * vec.y,
-    			1 - abs(vec.x + vec.y) - abs(vec.y - vec.x));
+    1 - abs(vec.x + vec.y) - abs(vec.y - vec.x));
 }
 
 vec3 normPyramid(vec2 position, vec3 finalPosition){
@@ -50,13 +50,13 @@ vec3 normPyramid(vec2 position, vec3 finalPosition){
 // Tunel - https://christopherchudzicki.github.io/MathBox-Demos/parametric_surfaces_3D.html
 vec3 getTunel(vec2 vec) {
     float u = vec.x * PI;
-	float v = vec.y * PI / 2.0;
+    float v = vec.y * PI / 2.0;
     vec3 position;
 
-	position.x = 3 * cos(u);
+    position.x = 3 * cos(u);
     position.y = 3 * sin(u);
     position.z = v;
-	return position / 3;
+    return position / 3;
 }
 
 vec3 normTunel(vec2 position, vec3 finalPosition) {
@@ -69,13 +69,13 @@ vec3 normTunel(vec2 position, vec3 finalPosition) {
 // Donut - https://stemkoski.github.io/Three.js/Graphulus-Surface.html
 vec3 getDonut(vec2 vec) {
     float u = vec.x * PI;
-	float v = vec.y * PI - PI / 2;
-	vec3 position;
+    float v = vec.y * PI - PI / 2;
+    vec3 position;
 
-	position.x = time * cos(u) + cos(v) * cos(u);
-	position.y = time * sin(u) + cos(v) * sin(u);
-	position.z = sin(v);
-	return position / 3;
+    position.x = time * cos(u) + cos(v) * cos(u);
+    position.y = time * sin(u) + cos(v) * sin(u);
+    position.z = sin(v);
+    return position / 3;
 }
 
 vec3 normDonut(vec2 position, vec3 finalPosition) {
@@ -100,10 +100,10 @@ vec3 getKleinBottle(vec2 vec) {
 
     float y;
     if (u >= 0 && u <= PI) {
-            position.y = 3 * sin(u) * (1 - cos(u)/2) * cos(v) + 19 * sin(u);
-        } else if (u >= PI && u <= 2*PI) {
-            position.y = 19 * sin(u);
-        }
+        position.y = 3 * sin(u) * (1 - cos(u)/2) * cos(v) + 19 * sin(u);
+    } else if (u >= PI && u <= 2*PI) {
+        position.y = 19 * sin(u);
+    }
 
     float z;
     position.z = 3 * (1 - cos(u)/2) * sin(v);
@@ -135,18 +135,18 @@ vec3 normHyperboloid(vec2 position, vec3 finalPosition) {
 }
 
 vec3 getSphereForLight(vec2 vec) {
-    float az = vec.x * PI; // <-1;1> -> <-PI;PI>
-    float ze = vec.y * PI / 2.0; // <-1;1> -> <-PI/2;PI/2>
+    float az = vec.x * PI;// <-1;1> -> <-PI;PI>
+    float ze = vec.y * PI / 2.0;// <-1;1> -> <-PI/2;PI/2>
 
-    float x = 0.1 * cos(az) * cos(ze);
-    float y = 0.1 * sin(az) * cos(ze);
-    float z = 0.1 * sin(ze);
+    float x = 0.03 * cos(az) * cos(ze);
+    float y = 0.03 * sin(az) * cos(ze);
+    float z = 0.03 * sin(ze);
     return vec3(x, y, z);
 }
 
 
 void main() {
-	vec2 position = inPosition * 2 - 1;
+    vec2 position = inPosition * 2 - 1;
     vec3 finalNormal;
     texCoord = inPosition;
     switch (type) {
@@ -179,8 +179,8 @@ void main() {
         break;
     }
 
-	vec4 pos4 = view * model * vec4(finalPosition, 1.0);
-	gl_Position = projection * pos4;
+    vec4 pos4 = view * model * vec4(finalPosition, 1.0);
+    gl_Position = projection * pos4;
     normal = inverse(transpose(mat3(view * model))) * normalize(finalNormal);
     viewDir = - pos4.xyz;
     lightDirView = vec3(view * vec4(lightPos, 1.0)) - pos4.xyz;

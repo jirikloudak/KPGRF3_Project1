@@ -14,7 +14,6 @@ import java.io.IOException;
 import java.nio.DoubleBuffer;
 
 import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_F;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL20.*;
 
@@ -26,21 +25,25 @@ import static org.lwjgl.opengl.GL20.*;
 public class Renderer extends AbstractRenderer {
 
     private int shaderProgram;
-    private float ambientStrength = 0.1f, diffuseStrength = 1.0f, specularStrength = 0.5f;
 
-    private int locView, locProjection, locType, locModel, locTime;
-    private int locLightPosition, locLightColor, locSpotDirection, locAmbientStrength, locDiffuseStrength, locSpecularStrength, locSpotCutOff;
-    private  int drawMode = 1;
+    private int locView, locProjection, locType, locModel, locTime, locDisplayModel;
+    private int locLightPosition;
+    private int locLightColor;
+    private int locSpotDirection;
+    private int locAmbientStrength;
+    private int locDiffuseStrength;
+    private int locSpecularStrength;
+    private int drawMode = 1, display = 1;
     private OGLBuffers buffers;
     private Camera camera, cameraForLight;
     private Mat4 projection;
-    private Mat4 matTranslSphere, matTranslDonut, matTranslBottle, matRotZ, matRotX, matRotY, matTranslTunel, matTranslHyperboloid;
+    private Mat4 matTranslSphere, matTranslDonut, matTranslBottle, matRotZ, matRotX, matRotY, matTranslTunel, matTranslHyperboloid, matRotSphere;
     private OGLTexture2D.Viewer textureViewer;
-    private OGLTexture2D textureSurface;
-    boolean mouseButton1 = false, perspProjection = true;
+    private OGLTexture2D texture2D;
+    boolean mouseButton1 = false, perspProjection = true, grow = false, mouseButton2 = false, showInfoText = false;
     double ox, oy;
-    private boolean draw = true, sceneMode = true;
-    private float time = 0;
+    private boolean sceneMode = true;
+    private float time = 0, velocity = 0;
 
 
     @Override
@@ -61,12 +64,12 @@ public class Renderer extends AbstractRenderer {
         locAmbientStrength = glGetUniformLocation(shaderProgram, "ambientStrength");
         locDiffuseStrength = glGetUniformLocation(shaderProgram, "diffuseStrength");
         locSpecularStrength = glGetUniformLocation(shaderProgram, "specularStrength");
-        locSpotCutOff = glGetUniformLocation(shaderProgram, "spotCutOff");
+        int locSpotCutOff = glGetUniformLocation(shaderProgram, "spotCutOff");
         locSpotDirection = glGetUniformLocation(shaderProgram, "spotDir");
         locTime = glGetUniformLocation(shaderProgram, "time");
+        locDisplayModel = glGetUniformLocation(shaderProgram, "display");
 
-
-        buffers = GridFactory.generateGrid(50, 50);
+        buffers = GridFactory.generateGrid(100, 100);
 
         camera = new Camera()
                 .withPosition(new Vec3D(6, 6, 5))
@@ -74,18 +77,19 @@ public class Renderer extends AbstractRenderer {
                 .withZenith(-1 / 5f * Math.PI);
 
         cameraForLight = new Camera()
-                .withPosition(new Vec3D(4, 3, 4))
+                .withPosition(new Vec3D(7, 3, 5))
                 .withAzimuth(5 / 4f * Math.PI)
                 .withZenith(-1 / 5f * Math.PI);
 
         textureViewer = new OGLTexture2D.Viewer();
         try {
-            textureSurface = new OGLTexture2D("./textures/wood.jpg");
+            String textureMaterial = "./textures/mosaic.jpg";
+            texture2D = new OGLTexture2D(textureMaterial);
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        matTranslSphere = new Mat4Transl(0.0, 0.0, 1.5);
+        matTranslSphere = new Mat4Transl(0.0, 0.0, 2.0);
         matTranslDonut = new Mat4Transl(0.0, 0.0, -3.2);
         matTranslBottle = new Mat4Transl(0.0, 1.8, 0.0);
         matTranslTunel = new Mat4Transl(0.0, 0.0, 0.0);
@@ -93,18 +97,25 @@ public class Renderer extends AbstractRenderer {
 
     }
 
-    public void render(){
+    public void render() {
+        glEnable(GL_DEPTH_TEST);
+        glViewport(0, 0, width, height);
         glUseProgram(shaderProgram);
+        glEnable(GL_DEPTH_TEST);
+        glViewport(0, 0, width, height);
         setMode();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        textureSurface.bind(shaderProgram, "textureId", 0);
+        texture2D.bind(shaderProgram, "textureId", 0);
 
         glUniformMatrix4fv(locView, false, camera.getViewMatrix().floatArray());
         glUniformMatrix4fv(locProjection, false, projection.floatArray());
 
+        float ambientStrength = 0.1f;
         glUniform1f(locAmbientStrength, ambientStrength);
+        float diffuseStrength = 1.0f;
         glUniform1f(locDiffuseStrength, diffuseStrength);
+        float specularStrength = 0.5f;
         glUniform1f(locSpecularStrength, specularStrength);
         glUniform3f(locSpotDirection,
                 (float) cameraForLight.getViewVector().getX(),
@@ -114,12 +125,13 @@ public class Renderer extends AbstractRenderer {
                 (float) cameraForLight.getPosition().getX(),
                 (float) cameraForLight.getPosition().getY(),
                 (float) cameraForLight.getPosition().getZ());
-        glUniform3f(locLightColor, 0.8f, 0.8f, 0.8f);
+        glUniform3f(locLightColor, 1.0f, 1.0f, 1.0f);
         glUniform1f(locTime, time);
+        glUniform1i(locDisplayModel, display);
 
-        if (sceneMode){
+        if (sceneMode) {
             // Draw Sphere
-            glUniformMatrix4fv(locModel, false, matTranslSphere.floatArray());
+            glUniformMatrix4fv(locModel, false, matTranslSphere.mul(matRotSphere).floatArray());
             glUniform1i(locType, 1);
             buffers.draw(GL_TRIANGLES, shaderProgram);
 
@@ -152,42 +164,73 @@ public class Renderer extends AbstractRenderer {
         glUniformMatrix4fv(locModel, false, new Mat4Transl(cameraForLight.getPosition()).floatArray());
         glUniform1i(locType, 7);
         buffers.draw(GL_TRIANGLE_STRIP, shaderProgram);
-
     }
 
     @Override
     public void display() {
+        String topText = "[SPACE] to change scene, [WASD] + left mouse to move, [C] ort/persp camera, [M] polygon mode, [Arrows] + right mouse move light source";
+        String topText2 = "[H] to change display mode";
+        String infoText = "Display: ";
+        String sceneText = "Scene: ";
         movementGenerator();
-
-        // znovu zapnout z-test (kvůli textRenderer)
-        glEnable(GL_DEPTH_TEST);
-
-        // nutno opravit viewport (kvůli textRenderer)
-        glViewport(0, 0, width, height);
         setProjection();
         render();
 
-
-        textureViewer.view(textureSurface, -1, -1, 0.5);
-        textRenderer.addStr2D(width - 90, height - 3, " (c) PGRF UHK");
-    }
-
-    public void movementGenerator(){
-        if (draw) {
-            if (time <= Math.PI * 2) time += 0.01;
-            else time = 0;
+        if (display == 1) {
+            infoText += "Basic color + light";
+        } else if (display == 2) {
+            infoText += "Texture + light";
+        } else if (display == 3) {
+            infoText += "Only texture without light";
+        } else if (display == 4) {
+            infoText += "Normal";
+        } else if (display == 5) {
+            infoText += "Depth";
+        } else if (display == 6) {
+            infoText += "Position";
+        } else if (display == 7) {
+            infoText += "Light distance (not working)";
         }
-        matRotZ = new Mat4RotZ(time*-1);
-        matRotX = new Mat4RotX(time);
-        matRotY = new Mat4RotY(time);
+
+        if (sceneMode) {
+            sceneText += "Scene 1";
+        } else {
+            sceneText += "Scene 2";
+        }
+
+        textureViewer.view(texture2D, -1, -1, 0.5);
+        textRenderer.addStr2D(5, 15, topText);
+        textRenderer.addStr2D(5, 30, topText2);
+        textRenderer.addStr2D(5, 250, infoText);
+        textRenderer.addStr2D(5, 270, sceneText);
+        textRenderer.addStr2D(width - 180, height - 3, "Jiří Klouda (c) PGRF UHK");
     }
 
-    private GLFWKeyCallback keyCallback = new GLFWKeyCallback() {
+    public void movementGenerator() {
+        boolean draw = true;
+        if (draw) {
+            if (grow) {
+                if (time <= Math.PI * 2) time += 0.01;
+                if (time > Math.PI * 2) grow = false;
+            } else {
+                if (time > 0) time -= 0.01;
+                if (time <= 0) grow = true;
+            }
+            if (velocity <= Math.PI * 2) velocity += 0.01;
+            else velocity = 0;
+        }
+        matRotZ = new Mat4RotZ(velocity * -1);
+        matRotSphere = new Mat4RotZ(velocity);
+        matRotX = new Mat4RotX(velocity);
+        matRotY = new Mat4RotY(velocity);
+    }
+
+    private final GLFWKeyCallback keyCallback = new GLFWKeyCallback() {
         @Override
         public void invoke(long window, int key, int scancode, int action, int mods) {
-            if ( key == GLFW_KEY_ESCAPE && action == GLFW_RELEASE )
+            if (key == GLFW_KEY_ESCAPE && action == GLFW_RELEASE)
                 glfwSetWindowShouldClose(window, true); // We will detect this in the rendering loop
-            if (action == GLFW_PRESS || action == GLFW_REPEAT){
+            if (action == GLFW_PRESS || action == GLFW_REPEAT) {
                 switch (key) {
                     case GLFW_KEY_W:
                         camera = camera.forward(1);
@@ -201,6 +244,18 @@ public class Renderer extends AbstractRenderer {
                     case GLFW_KEY_A:
                         camera = camera.left(1);
                         break;
+                    case GLFW_KEY_UP:
+                        cameraForLight = cameraForLight.forward(1);
+                        break;
+                    case GLFW_KEY_RIGHT:
+                        cameraForLight = cameraForLight.right(1);
+                        break;
+                    case GLFW_KEY_DOWN:
+                        cameraForLight = cameraForLight.backward(1);
+                        break;
+                    case GLFW_KEY_LEFT:
+                        cameraForLight = cameraForLight.left(1);
+                        break;
                     case GLFW_KEY_LEFT_CONTROL:
                         camera = camera.down(1);
                         break;
@@ -211,35 +266,33 @@ public class Renderer extends AbstractRenderer {
                         //camera = camera.withFirstPerson(!camera.getFirstPerson());
                         sceneMode = !sceneMode;
                         break;
-                    case GLFW_KEY_R:
-                        camera = camera.mulRadius(0.9f);
-                        break;
-                    case GLFW_KEY_F:
-                        camera = camera.mulRadius(1.1f);
-                        break;
                     case GLFW_KEY_C:
                         perspProjection = !perspProjection;
                         break;
+                    case GLFW_KEY_H:
+                        if (display < 7) {
+                            display += 1;
+                        } else display = 1;
+                        break;
                     case GLFW_KEY_M:
-                        if (drawMode < 3){
-                            drawMode +=1;
-                            System.out.println(drawMode);
+                        if (drawMode < 3) {
+                            drawMode += 1;
                         } else {
-                        drawMode = 1;
-                        System.out.println(drawMode);
-                    }
+                            drawMode = 1;
+                        }
                         break;
                 }
             }
         }
     };
 
-    private GLFWMouseButtonCallback mbCallback = new GLFWMouseButtonCallback () {
+    private final GLFWMouseButtonCallback mbCallback = new GLFWMouseButtonCallback() {
         @Override
         public void invoke(long window, int button, int action, int mods) {
             mouseButton1 = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS;
+            mouseButton2 = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_2) == GLFW_PRESS;
 
-            if (button==GLFW_MOUSE_BUTTON_1 && action == GLFW_PRESS){
+            if (button == GLFW_MOUSE_BUTTON_1 && action == GLFW_PRESS) {
                 mouseButton1 = true;
                 DoubleBuffer xBuffer = BufferUtils.createDoubleBuffer(1);
                 DoubleBuffer yBuffer = BufferUtils.createDoubleBuffer(1);
@@ -248,27 +301,35 @@ public class Renderer extends AbstractRenderer {
                 oy = yBuffer.get(0);
             }
 
-            if (button==GLFW_MOUSE_BUTTON_1 && action == GLFW_RELEASE){
+            if (button == GLFW_MOUSE_BUTTON_1 && action == GLFW_RELEASE) {
                 mouseButton1 = false;
                 DoubleBuffer xBuffer = BufferUtils.createDoubleBuffer(1);
                 DoubleBuffer yBuffer = BufferUtils.createDoubleBuffer(1);
                 glfwGetCursorPos(window, xBuffer, yBuffer);
                 double x = xBuffer.get(0);
                 double y = yBuffer.get(0);
-                camera = camera.addAzimuth((double) Math.PI * (ox - x) / width)
-                        .addZenith((double) Math.PI * (oy - y) / width);
+                camera = camera.addAzimuth(Math.PI * (ox - x) / width)
+                        .addZenith(Math.PI * (oy - y) / width);
+                cameraForLight = cameraForLight.addAzimuth(Math.PI * (ox - x) / width)
+                        .addZenith(Math.PI * (oy - y) / width);
                 ox = x;
                 oy = y;
             }
         }
     };
 
-    private GLFWCursorPosCallback cpCallbacknew = new GLFWCursorPosCallback() {
+    private final GLFWCursorPosCallback cpCallbacknew = new GLFWCursorPosCallback() {
         @Override
         public void invoke(long window, double x, double y) {
             if (mouseButton1) {
-                camera = camera.addAzimuth((double) Math.PI * (ox - x) / width)
-                        .addZenith((double) Math.PI * (oy - y) / width);
+                camera = camera.addAzimuth(Math.PI * (ox - x) / width)
+                        .addZenith(Math.PI * (oy - y) / width);
+                ox = x;
+                oy = y;
+            }
+            if (mouseButton2) {
+                cameraForLight = cameraForLight.addAzimuth(Math.PI * (ox - x) / width)
+                        .addZenith(Math.PI * (oy - y) / width);
                 ox = x;
                 oy = y;
             }
@@ -290,25 +351,19 @@ public class Renderer extends AbstractRenderer {
         return cpCallbacknew;
     }
 
-    public void setProjection(){
-        if (perspProjection){
+    public void setProjection() {
+        if (perspProjection) {
             projection = new Mat4PerspRH(Math.PI / 3, LwjglWindow.HEIGHT / (float) LwjglWindow.WIDTH, 1, 20);
         } else {
             projection = new Mat4OrthoRH(50, 50, 0.1, 100);
         }
     }
 
-    public void setMode(){
-        switch (drawMode){
-            case 1:
-                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-                break;
-            case 2:
-                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-                break;
-            case 3:
-                glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-                break;
+    public void setMode() {
+        switch (drawMode) {
+            case 1 -> glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+            case 2 -> glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            case 3 -> glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
         }
     }
 
