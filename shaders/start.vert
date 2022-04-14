@@ -108,7 +108,7 @@ vec3 getKleinBottle(vec2 vec) {
     float z;
     position.z = 3 * (1 - cos(u)/2) * sin(v);
 
-    return position / 5;
+    return position / 7.5;
 }
 
 vec3 normBottle(vec2 position, vec3 finalPosition) {
@@ -144,6 +144,10 @@ vec3 getSphereForLight(vec2 vec) {
     return vec3(x, y, z);
 }
 
+vec3 getFlat(vec2 vec) {
+    return vec3(0, 0, 0);
+}
+
 
 void main() {
     vec2 position = inPosition * 2 - 1;
@@ -176,6 +180,10 @@ void main() {
         break;
         case 7:
         finalPosition = getSphereForLight(position);
+        break;
+        case 8:
+        finalPosition = vec3(position, 0.0);
+        finalNormal = vec3(0, 0, 1);
         break;
     }
 

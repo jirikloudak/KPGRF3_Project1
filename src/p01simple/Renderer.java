@@ -2,6 +2,7 @@ package p01simple;
 //package lvl2advanced.p01gui.p01simple;
 
 import lwjglutils.OGLBuffers;
+import lwjglutils.OGLRenderTarget;
 import lwjglutils.OGLTexture2D;
 import lwjglutils.ShaderUtils;
 import org.lwjgl.BufferUtils;
@@ -16,6 +17,9 @@ import java.nio.DoubleBuffer;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL20.*;
+import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER;
+import static org.lwjgl.opengl.GL30.glBindFramebuffer;
+import static org.lwjgl.opengl.GL31.glPrimitiveRestartIndex;
 
 /**
  * @author PGRF FIM UHK
@@ -24,26 +28,27 @@ import static org.lwjgl.opengl.GL20.*;
  */
 public class Renderer extends AbstractRenderer {
 
-    private int shaderProgram;
+    private int shaderProgram, shaderProgramPostProcessing;
 
-    private int locView, locProjection, locType, locModel, locTime, locDisplayModel;
+    private int locView, locProjection, locType, locModel, locTime, locDisplayModel, locPostDisplayModel;
     private int locLightPosition;
     private int locLightColor;
     private int locSpotDirection;
     private int locAmbientStrength;
     private int locDiffuseStrength;
     private int locSpecularStrength;
-    private int drawMode = 1, display = 1;
-    private OGLBuffers buffers;
+    private int drawMode = 1, display = 1, postDisplay = 0;
+    private OGLBuffers buffers, buffersPostProcessing;
     private Camera camera, cameraForLight;
     private Mat4 projection;
-    private Mat4 matTranslSphere, matTranslDonut, matTranslBottle, matRotZ, matRotX, matRotY, matTranslTunel, matTranslHyperboloid, matRotSphere;
+    private Mat4 matTranslSphere, matTranslDonut, matTranslBottle, matRotZ, matRotX, matRotY, matTranslTunel, matTranslHyperboloid, matRotSphere, matTranslWall, matTranslWall2;
     private OGLTexture2D.Viewer textureViewer;
     private OGLTexture2D texture2D;
-    boolean mouseButton1 = false, perspProjection = true, grow = false, mouseButton2 = false, showInfoText = false;
+    boolean mouseButton1 = false, perspProjection = true, grow = false, mouseButton2 = false;
     double ox, oy;
     private boolean sceneMode = true;
     private float time = 0, velocity = 0;
+    private OGLRenderTarget renderTarget;
 
 
     @Override
@@ -51,9 +56,8 @@ public class Renderer extends AbstractRenderer {
         super.init();
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 
-        glEnable(GL_DEPTH_TEST); // zapne z-test (z-buffer) - až po new OGLTextRenderer (uvnitř super.init())
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); // vyplnění přivrácených i odvrácených stran
         shaderProgram = ShaderUtils.loadProgram("/start");
+        shaderProgramPostProcessing = ShaderUtils.loadProgram("/post");
 
         locModel = glGetUniformLocation(shaderProgram, "model");
         locView = glGetUniformLocation(shaderProgram, "view");
@@ -64,12 +68,16 @@ public class Renderer extends AbstractRenderer {
         locAmbientStrength = glGetUniformLocation(shaderProgram, "ambientStrength");
         locDiffuseStrength = glGetUniformLocation(shaderProgram, "diffuseStrength");
         locSpecularStrength = glGetUniformLocation(shaderProgram, "specularStrength");
-        int locSpotCutOff = glGetUniformLocation(shaderProgram, "spotCutOff");
+        //int locSpotCutOff = glGetUniformLocation(shaderProgram, "spotCutOff");
         locSpotDirection = glGetUniformLocation(shaderProgram, "spotDir");
         locTime = glGetUniformLocation(shaderProgram, "time");
         locDisplayModel = glGetUniformLocation(shaderProgram, "display");
+        locPostDisplayModel = glGetUniformLocation(shaderProgramPostProcessing, "postDisplay");
 
         buffers = GridFactory.generateGrid(100, 100);
+        buffersPostProcessing = GridFactory.generateGrid(2, 2);
+
+        renderTarget = new OGLRenderTarget(1024, 1024);
 
         camera = new Camera()
                 .withPosition(new Vec3D(6, 6, 5))
@@ -94,16 +102,13 @@ public class Renderer extends AbstractRenderer {
         matTranslBottle = new Mat4Transl(0.0, 1.8, 0.0);
         matTranslTunel = new Mat4Transl(0.0, 0.0, 0.0);
         matTranslHyperboloid = new Mat4Transl(0.0, 0.0, 0.0);
-
+        matTranslWall = new Mat4Scale(5).mul(new Mat4Transl(0.0, 0.0, -5.0)).mul(new Mat4RotY(1.5));
+        matTranslWall2 = new Mat4Scale(5).mul(new Mat4Transl(0.0, 0.0, -5.0));
     }
 
     public void render() {
-        glEnable(GL_DEPTH_TEST);
-        glViewport(0, 0, width, height);
         glUseProgram(shaderProgram);
-        glEnable(GL_DEPTH_TEST);
-        glViewport(0, 0, width, height);
-        setMode();
+        renderTarget.bind();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         texture2D.bind(shaderProgram, "textureId", 0);
@@ -161,20 +166,41 @@ public class Renderer extends AbstractRenderer {
             buffers.draw(GL_TRIANGLES, shaderProgram);
         }
 
+        glUniformMatrix4fv(locModel, false, matTranslWall.floatArray());
+        glUniform1i(locType, 8);
+        buffers.draw(GL_TRIANGLES, shaderProgram);
+
+        glUniformMatrix4fv(locModel, false, matTranslWall2.floatArray());
+        glUniform1i(locType, 8);
+        buffers.draw(GL_TRIANGLES, shaderProgram);
+
         glUniformMatrix4fv(locModel, false, new Mat4Transl(cameraForLight.getPosition()).floatArray());
         glUniform1i(locType, 7);
         buffers.draw(GL_TRIANGLE_STRIP, shaderProgram);
     }
 
+    private void postProcessingRender() {
+        glUseProgram(shaderProgramPostProcessing);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glViewport(0, 0, width, height);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+        glUniform1i(locPostDisplayModel, postDisplay);
+
+        renderTarget.getColorTexture().bind(shaderProgramPostProcessing, "texturePost", 0);
+        buffersPostProcessing.draw(GL_TRIANGLE_STRIP, shaderProgramPostProcessing);
+    }
+
+
     @Override
     public void display() {
         String topText = "[SPACE] to change scene, [WASD] + left mouse to move, [C] ort/persp camera, [M] polygon mode, [Arrows] + right mouse move light source";
-        String topText2 = "[H] to change display mode";
+        String topText2 = "[H] to change display mode, [P] to change post mode";
         String infoText = "Display: ";
         String sceneText = "Scene: ";
-        movementGenerator();
-        setProjection();
-        render();
+        String postText = "Post mode: ";
+        String spotText = "Spot vector: ";
 
         if (display == 1) {
             infoText += "Basic color + light";
@@ -192,33 +218,57 @@ public class Renderer extends AbstractRenderer {
             infoText += "Light distance (not working)";
         }
 
+        if (postDisplay == 0) {
+            postText += "No effect";
+        } else if (postDisplay == 1) {
+            postText += "Grayscale";
+        } else if (postDisplay == 2) {
+            postText += "Red only";
+        } else if (postDisplay == 3) {
+            postText += "Green only";
+        } else if (postDisplay == 4) {
+            postText += "Blue only";
+        } else if (postDisplay == 5) {
+            postText += "Negative";
+
+        }
         if (sceneMode) {
             sceneText += "Scene 1";
         } else {
             sceneText += "Scene 2";
         }
 
+        spotText += cameraForLight.getViewVector();
+
+        movementGenerator();
+        setProjection();
+        setMode();
+        glEnable(GL_DEPTH_TEST);
+        render();
+        postProcessingRender();
+        glDisable(GL_DEPTH_TEST);
+
         textureViewer.view(texture2D, -1, -1, 0.5);
+        textureViewer.view(renderTarget.getColorTexture(), -1, -0.5, 0.5);
         textRenderer.addStr2D(5, 15, topText);
         textRenderer.addStr2D(5, 30, topText2);
-        textRenderer.addStr2D(5, 250, infoText);
-        textRenderer.addStr2D(5, 270, sceneText);
+        textRenderer.addStr2D(5, 230, infoText);
+        textRenderer.addStr2D(5, 250, sceneText);
+        textRenderer.addStr2D(5, 270, postText);
+        textRenderer.addStr2D(5, 290, spotText);
         textRenderer.addStr2D(width - 180, height - 3, "Jiří Klouda (c) PGRF UHK");
     }
 
     public void movementGenerator() {
-        boolean draw = true;
-        if (draw) {
-            if (grow) {
-                if (time <= Math.PI * 2) time += 0.01;
-                if (time > Math.PI * 2) grow = false;
-            } else {
-                if (time > 0) time -= 0.01;
-                if (time <= 0) grow = true;
-            }
-            if (velocity <= Math.PI * 2) velocity += 0.01;
-            else velocity = 0;
+        if (grow) {
+            if (time <= Math.PI * 2) time += 0.01;
+            if (time > Math.PI * 2) grow = false;
+        } else {
+            if (time > 0) time -= 0.01;
+            if (time <= 0) grow = true;
         }
+        if (velocity <= Math.PI * 2) velocity += 0.01;
+        else velocity = 0;
         matRotZ = new Mat4RotZ(velocity * -1);
         matRotSphere = new Mat4RotZ(velocity);
         matRotX = new Mat4RotX(velocity);
@@ -280,6 +330,11 @@ public class Renderer extends AbstractRenderer {
                         } else {
                             drawMode = 1;
                         }
+                        break;
+                    case GLFW_KEY_P:
+                        if (postDisplay < 5) {
+                            postDisplay += 1;
+                        } else postDisplay = 0;
                         break;
                 }
             }
