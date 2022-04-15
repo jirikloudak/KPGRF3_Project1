@@ -19,7 +19,6 @@ import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER;
 import static org.lwjgl.opengl.GL30.glBindFramebuffer;
-import static org.lwjgl.opengl.GL31.glPrimitiveRestartIndex;
 
 /**
  * @author PGRF FIM UHK
@@ -29,6 +28,7 @@ import static org.lwjgl.opengl.GL31.glPrimitiveRestartIndex;
 public class Renderer extends AbstractRenderer {
 
     private int shaderProgram, shaderProgramPostProcessing;
+    float ambientStrength = 0.1f, diffuseStrength = 0.7f, specularStrength = 0.5f;
 
     private int locView, locProjection, locType, locModel, locTime, locDisplayModel, locPostDisplayModel;
     private int locLightPosition;
@@ -116,11 +116,9 @@ public class Renderer extends AbstractRenderer {
         glUniformMatrix4fv(locView, false, camera.getViewMatrix().floatArray());
         glUniformMatrix4fv(locProjection, false, projection.floatArray());
 
-        float ambientStrength = 0.1f;
+
         glUniform1f(locAmbientStrength, ambientStrength);
-        float diffuseStrength = 1.0f;
         glUniform1f(locDiffuseStrength, diffuseStrength);
-        float specularStrength = 0.5f;
         glUniform1f(locSpecularStrength, specularStrength);
         glUniform3f(locSpotDirection,
                 (float) cameraForLight.getViewVector().getX(),
@@ -196,10 +194,11 @@ public class Renderer extends AbstractRenderer {
     @Override
     public void display() {
         String topText = "[SPACE] to change scene, [WASD] + left mouse to move, [C] ort/persp camera, [M] polygon mode, [Arrows] + right mouse move light source";
-        String topText2 = "[H] to change display mode, [P] to change post mode";
+        String topText2 = "[H] to change display mode, [P] to change post mode, [1][2][3] to on/off specular, diffuse and ambient light";
         String infoText = "Display: ";
         String sceneText = "Scene: ";
         String postText = "Post mode: ";
+        String lightText = "Light mode: ";
         String spotText = "Spot vector: ";
 
         if (display == 1) {
@@ -240,6 +239,25 @@ public class Renderer extends AbstractRenderer {
 
         spotText += cameraForLight.getViewVector();
 
+        lightText += "Ambient= ";
+        if (ambientStrength == 0) {
+            lightText += "Off, ";
+        } else {
+            lightText += "On, ";
+        }
+        lightText += "Specular= ";
+        if (specularStrength == 0) {
+            lightText += "Off, ";
+        } else {
+            lightText += "On, ";
+        }
+        lightText += "Diffuse= ";
+        if (diffuseStrength == 0) {
+            lightText += "Off, ";
+        } else {
+            lightText += "On, ";
+        }
+
         movementGenerator();
         setProjection();
         setMode();
@@ -252,10 +270,11 @@ public class Renderer extends AbstractRenderer {
         textureViewer.view(renderTarget.getColorTexture(), -1, -0.5, 0.5);
         textRenderer.addStr2D(5, 15, topText);
         textRenderer.addStr2D(5, 30, topText2);
+        textRenderer.addStr2D(5, 210, spotText);
         textRenderer.addStr2D(5, 230, infoText);
         textRenderer.addStr2D(5, 250, sceneText);
         textRenderer.addStr2D(5, 270, postText);
-        textRenderer.addStr2D(5, 290, spotText);
+        textRenderer.addStr2D(5, 290, lightText);
         textRenderer.addStr2D(width - 180, height - 3, "Jiří Klouda (c) PGRF UHK");
     }
 
@@ -335,6 +354,21 @@ public class Renderer extends AbstractRenderer {
                         if (postDisplay < 5) {
                             postDisplay += 1;
                         } else postDisplay = 0;
+                        break;
+                    case GLFW_KEY_1:
+                        if (ambientStrength == 0) {
+                            ambientStrength = 0.1f;
+                        } else ambientStrength = 0;
+                        break;
+                    case GLFW_KEY_2:
+                        if (specularStrength == 0) {
+                            specularStrength = 0.5f;
+                        } else specularStrength = 0;
+                        break;
+                    case GLFW_KEY_3:
+                        if (diffuseStrength == 0) {
+                            diffuseStrength = 0.7f;
+                        } else diffuseStrength = 0;
                         break;
                 }
             }
